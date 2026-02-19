@@ -1,0 +1,246 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🏓 Smart PingPong Admin</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        dark: '#121212',
+                        card: '#1e1e1e',
+                        accent: '#00e676',
+                        danger: '#ff5252'
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        /* Custom Scrollbar untuk Log */
+        .logs::-webkit-scrollbar { width: 8px; }
+        .logs::-webkit-scrollbar-track { background: #111; }
+        .logs::-webkit-scrollbar-thumb { background: #333; border-radius: 4px; }
+        
+        /* Toggle Switch Custom */
+        .toggle-checkbox:checked {
+            right: 0;
+            border-color: #00e676;
+        }
+        .toggle-checkbox:checked + .toggle-label {
+            background-color: #00e676;
+        }
+    </style>
+</head>
+<body class="bg-dark text-gray-200 font-sans min-h-screen p-4 pb-20">
+
+    <div class="max-w-6xl mx-auto flex justify-between items-center mb-6 border-b border-gray-800 pb-4">
+        <div>
+            <h1 class="text-2xl md:text-3xl font-bold text-accent tracking-tight">🏓 Smart PingPong</h1>
+            <p class="text-xs text-gray-500 mt-1">Admin Control Center</p>
+        </div>
+        <div class="flex items-center gap-2">
+            <span class="w-2 h-2 rounded-full bg-green-500 animate-pulse"></span>
+            <span class="text-xs font-mono text-gray-400">ONLINE</span>
+        </div>
+    </div>
+
+    <div class="max-w-6xl mx-auto space-y-6">
+
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {% for id, node in nodes.items() %}
+            <div class="relative bg-black rounded-xl overflow-hidden shadow-lg border border-gray-800 aspect-[4/3] group">
+                <div class="absolute top-2 left-2 z-10 bg-black/70 backdrop-blur-sm px-3 py-1 rounded-md border border-gray-700">
+                    <div class="text-xs font-bold text-white">{{ node.label }}</div>
+                    <div class="text-[10px] text-gray-400 font-mono">{{ id }}</div>
+                </div>
+                
+                <img class="w-full h-full object-contain bg-gray-900" 
+                     src="/video_feed/{{ id }}" 
+                     onerror="this.src='https://placehold.co/640x480/1a1a1a/FFF?text=No+Signal';">
+                
+                <div class="absolute top-2 right-2 z-10" id="badge-ai-{{ id }}" style="display: none;">
+                    <span class="bg-blue-600/90 text-white text-[10px] font-bold px-2 py-1 rounded shadow-sm">AI ON</span>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+
+        <div class="bg-card rounded-xl p-5 border border-gray-800 shadow-xl">
+            <h2 class="text-lg font-bold text-white mb-4 flex items-center gap-2">
+                <svg class="w-5 h-5 text-accent" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path></svg>
+                Master Control (All Cams)
+            </h2>
+            
+            <div class="flex flex-col md:flex-row gap-4 items-center justify-between">
+                <div class="grid grid-cols-2 gap-3 w-full md:w-auto">
+                    <select id="global-res" class="bg-gray-800 border border-gray-700 text-sm rounded-lg p-2.5 text-white focus:ring-accent focus:border-accent block w-full">
+                        <option value="320,240">Low (320x240)</option>
+                        <option value="512,384" selected>Med (512x384)</option>
+                        <option value="640,480">High (HD)</option>
+                    </select>
+                    <select id="global-fps" class="bg-gray-800 border border-gray-700 text-sm rounded-lg p-2.5 text-white focus:ring-accent focus:border-accent block w-full">
+                        <option value="10">10 FPS</option>
+                        <option value="15" selected>15 FPS</option>
+                        <option value="25">25 FPS</option>
+                    </select>
+                </div>
+
+                <div class="flex gap-2 w-full md:w-auto">
+                    <button onclick="sendGlobal('START')" class="flex-1 md:flex-none bg-accent hover:bg-green-500 text-black font-bold py-2.5 px-6 rounded-lg transition transform active:scale-95 shadow-lg shadow-green-900/20">
+                        ▶ START ALL
+                    </button>
+                    <button onclick="sendGlobal('STOP')" class="flex-1 md:flex-none bg-danger hover:bg-red-600 text-white font-bold py-2.5 px-6 rounded-lg transition transform active:scale-95 shadow-lg shadow-red-900/20">
+                        ⏹ STOP ALL
+                    </button>
+                </div>
+
+                <div class="flex items-center justify-center bg-gray-800 px-4 py-2 rounded-lg border border-gray-700 w-full md:w-auto gap-3">
+                    <span class="text-sm font-bold text-gray-300">🤖 AI ALL</span>
+                    <div class="relative inline-block w-10 mr-2 align-middle select-none transition duration-200 ease-in">
+                        <input type="checkbox" name="toggle" id="global-ai" class="toggle-checkbox absolute block w-5 h-5 rounded-full bg-white border-4 appearance-none cursor-pointer border-gray-500 transition-all duration-300" onchange="toggleAI('ALL', this.checked)"/>
+                        <label for="global-ai" class="toggle-label block overflow-hidden h-5 rounded-full bg-gray-500 cursor-pointer transition-colors duration-300"></label>
+                    </div>
+                </div>
+            </div>
+
+            <div class="mt-6 pt-4 border-t border-gray-700 flex flex-col md:flex-row items-start md:items-center gap-4">
+                <span class="text-xs font-bold text-orange-400 bg-orange-400/10 px-2 py-1 rounded border border-orange-400/20">⚠️ DANGER ZONE</span>
+                <div class="flex gap-2 w-full md:w-auto overflow-x-auto pb-1">
+                    <button onclick="sys('ALL', 'RESTART_SERVICE')" class="whitespace-nowrap bg-purple-600 hover:bg-purple-700 text-white text-xs font-bold py-2 px-4 rounded transition">Restart Apps</button>
+                    <button onclick="sys('ALL', 'REBOOT_PI')" class="whitespace-nowrap bg-gray-700 hover:bg-gray-600 border border-gray-600 text-white text-xs font-bold py-2 px-4 rounded transition">Reboot Pi</button>
+                    <button onclick="sys('ALL', 'SHUTDOWN_PI')" class="whitespace-nowrap bg-black hover:bg-gray-900 border border-red-900 text-red-500 text-xs font-bold py-2 px-4 rounded transition">Matikan Total</button>
+                </div>
+            </div>
+        </div>
+
+        <h2 class="text-xl font-bold text-gray-300 mt-8 mb-4 px-2">Individual Settings</h2>
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+            {% for id, node in nodes.items() %}
+            <div class="bg-card border border-gray-800 rounded-xl p-4 shadow-md flex flex-col gap-3">
+                <div class="flex justify-between items-start">
+                    <div>
+                        <h3 class="font-bold text-white text-lg">{{ node.label }}</h3>
+                        <p class="text-xs text-gray-500 font-mono">{{ id }}</p>
+                    </div>
+                    <div class="flex flex-col items-center">
+                        <div class="relative inline-block w-8 align-middle select-none">
+                            <input type="checkbox" id="ai-{{ id }}" class="toggle-checkbox absolute block w-4 h-4 rounded-full bg-white border-4 appearance-none cursor-pointer border-gray-500 transition-all duration-300" onchange="toggleAI('{{ id }}', this.checked)"/>
+                            <label for="ai-{{ id }}" class="toggle-label block overflow-hidden h-4 rounded-full bg-gray-500 cursor-pointer"></label>
+                        </div>
+                        <span id="ai-txt-{{ id }}" class="text-[10px] text-gray-500 font-bold mt-1">AI OFF</span>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-2 gap-2">
+                    <select id="res-{{ id }}" class="bg-gray-900 text-xs text-white rounded p-2 border border-gray-700">
+                        <option value="320,240">Low (Fast)</option>
+                        <option value="512,384" selected>Med</option>
+                        <option value="640,480">High</option>
+                    </select>
+                    <select id="fps-{{ id }}" class="bg-gray-900 text-xs text-white rounded p-2 border border-gray-700">
+                        <option value="10">10 FPS</option>
+                        <option value="15" selected>15 FPS</option>
+                        <option value="25">25 FPS</option>
+                    </select>
+                </div>
+
+                <div class="grid grid-cols-2 gap-2 mt-auto">
+                    <button onclick="sendSingle('{{ id }}', 'START')" class="bg-gray-700 hover:bg-green-600 text-white text-xs font-bold py-2 rounded transition">START</button>
+                    <button onclick="sendSingle('{{ id }}', 'STOP')" class="bg-gray-700 hover:bg-red-600 text-white text-xs font-bold py-2 rounded transition">STOP</button>
+                </div>
+
+                <details class="group">
+                    <summary class="text-[10px] text-gray-500 cursor-pointer hover:text-gray-300 text-center select-none list-none pt-2 border-t border-gray-800 mt-2">
+                        Advanced Options ▼
+                    </summary>
+                    <div class="flex gap-2 mt-2">
+                        <button onclick="sys('{{ id }}', 'RESTART_SERVICE')" class="flex-1 bg-purple-900/50 hover:bg-purple-800 text-purple-300 text-[10px] py-1.5 rounded border border-purple-900">Restart App</button>
+                        <button onclick="sys('{{ id }}', 'REBOOT_PI')" class="flex-1 bg-red-900/50 hover:bg-red-800 text-red-300 text-[10px] py-1.5 rounded border border-red-900">Reboot Pi</button>
+                    </div>
+                </details>
+            </div>
+            {% endfor %}
+        </div>
+
+        <div class="mt-8">
+            <h3 class="text-xs font-bold text-gray-500 mb-2 uppercase">System Logs</h3>
+            <div id="logs" class="logs h-32 bg-black rounded-lg border border-gray-800 p-3 font-mono text-xs text-green-500 overflow-y-auto shadow-inner">
+                <div>[SYSTEM] Dashboard Ready. Waiting for commands...</div>
+            </div>
+        </div>
+
+        <div class="text-center text-gray-600 text-xs mt-8">
+            Smart PingPong v2.0 - Optimized for Mobile & Desktop
+        </div>
+    </div>
+
+    <script>
+        function log(msg) {
+            const l = document.getElementById('logs');
+            const time = new Date().toLocaleTimeString('id-ID', {hour12: false});
+            // Auto scroll ke bawah
+            l.innerHTML += `<div class="border-b border-gray-900/50 py-0.5"><span class="text-gray-600">[${time}]</span> ${msg}</div>`;
+            l.scrollTop = l.scrollHeight;
+        }
+
+        function api(url, data) {
+            const fd = new FormData();
+            for(let k in data) fd.append(k, data[k]);
+            
+            fetch(url, {method:'POST', body:fd})
+                .then(r=>r.json())
+                .then(d=>log("✅ OK: " + JSON.stringify(d)))
+                .catch(e=>log("❌ Error: " + e));
+        }
+
+        function sendGlobal(act) {
+            const res = document.getElementById('global-res').value.split(',');
+            const fps = document.getElementById('global-fps').value;
+            log(`🚀 Broadcasting ${act} ALL...`);
+            api('/api/control', {target:'ALL', action:act, width:res[0], height:res[1], fps:fps});
+            if(act==='START') setTimeout(refreshImages, 1000);
+        }
+
+        function sendSingle(tgt, act) {
+            const res = document.getElementById('res-'+tgt).value.split(',');
+            const fps = document.getElementById('fps-'+tgt).value;
+            log(`📡 Sending ${act} -> ${tgt}`);
+            api('/api/control', {target:tgt, action:act, width:res[0], height:res[1], fps:fps});
+            if(act==='START') setTimeout(refreshImages, 1000);
+        }
+
+        function toggleAI(tgt, status) {
+            log(`🤖 AI Mode ${tgt}: ${status ? "ON" : "OFF"}`);
+            api('/api/toggle_ai', {target:tgt, status:status});
+            
+            // Update UI Labels
+            if(tgt !== 'ALL') {
+                const lbl = document.getElementById('ai-txt-'+tgt);
+                const badge = document.getElementById('badge-ai-'+tgt);
+                lbl.innerText = status ? "AI ON" : "AI OFF";
+                lbl.className = status ? "text-[10px] font-bold mt-1 text-blue-400" : "text-[10px] font-bold mt-1 text-gray-500";
+                
+                // Tampilkan Badge di Video
+                if(badge) badge.style.display = status ? 'block' : 'none';
+            }
+        }
+
+        function sys(tgt, act) {
+            if(confirm(`⚠️ WARNING ⚠️\n\nAksi: ${act}\nTarget: ${tgt}\n\nLanjutkan?`)) {
+                log(`⚡ SYSTEM CMD: ${act} -> ${tgt}`);
+                api('/api/control', {target:tgt, action:act, width:320, height:240, fps:15});
+            }
+        }
+
+        function refreshImages() {
+            document.querySelectorAll('img').forEach(img => {
+                let s = img.src; img.src=''; setTimeout(()=>img.src=s, 100);
+            });
+        }
+    </script>
+</body>
+</html>

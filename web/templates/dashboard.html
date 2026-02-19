@@ -1,0 +1,552 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🏓 Smart PingPong Admin v2.1</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        dark: '#121212',
+                        card: '#1e1e1e',
+                        accent: '#00e676',
+                        danger: '#ff5252'
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        .logs::-webkit-scrollbar { width: 8px; }
+        .logs::-webkit-scrollbar-track { background: #111; }
+        .logs::-webkit-scrollbar-thumb { background: #333; border-radius: 4px; }
+        
+        .toggle-checkbox:checked {
+            right: 0;
+            border-color: #00e676;
+        }
+        .toggle-checkbox:checked + .toggle-label {
+            background-color: #00e676;
+        }
+        
+        /* Calibration overlay styles */
+        .calibration-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.7);
+            display: none;
+            z-index: 50;
+        }
+        
+        .calibration-point {
+            position: absolute;
+            width: 20px;
+            height: 20px;
+            background: #00e676;
+            border: 3px solid white;
+            border-radius: 50%;
+            transform: translate(-50%, -50%);
+            cursor: pointer;
+            box-shadow: 0 0 10px rgba(0, 230, 118, 0.8);
+        }
+        
+        .calibration-line {
+            position: absolute;
+            background: #00e676;
+            height: 2px;
+            transform-origin: left center;
+        }
+    </style>
+</head>
+<body class="bg-dark text-gray-200 font-sans min-h-screen p-4 pb-20">
+
+    <div class="max-w-6xl mx-auto flex justify-between items-center mb-6 border-b border-gray-800 pb-4">
+        <div>
+            <h1 class="text-2xl md:text-3xl font-bold text-accent tracking-tight">🏓 Smart PingPong</h1>
+            <p class="text-xs text-gray-500 mt-1">Admin Control Center v2.1</p>
+        </div>
+        <div class="flex items-center gap-2">
+            <span class="w-2 h-2 rounded-full bg-green-500 animate-pulse"></span>
+            <span class="text-xs font-mono text-gray-400">ONLINE</span>
+        </div>
+    </div>
+
+    <div class="max-w-6xl mx-auto space-y-6">
+
+        <!-- VIDEO GRID with Calibration Support -->
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {% for id, node in nodes.items() %}
+            <div id="video-container-{{ id }}" class="relative bg-black rounded-xl overflow-hidden shadow-lg border border-gray-800 aspect-[4/3] group">
+                <!-- Camera Label -->
+                <div class="absolute top-2 left-2 z-10 bg-black/70 backdrop-blur-sm px-3 py-1 rounded-md border border-gray-700">
+                    <div class="text-xs font-bold text-white">{{ node.label }}</div>
+                    <div class="text-[10px] text-gray-400 font-mono">{{ id }}</div>
+                </div>
+                
+                <!-- Video Feed -->
+                <img id="video-{{ id }}" class="w-full h-full object-contain bg-gray-900" 
+                     src="/video_feed/{{ id }}" 
+                     onerror="this.src='https://placehold.co/640x480/1a1a1a/FFF?text=No+Signal';">
+                
+                <!-- AI Badge -->
+                <div class="absolute top-2 right-2 z-10" id="badge-ai-{{ id }}" style="display: none;">
+                    <span class="bg-blue-600/90 text-white text-[10px] font-bold px-2 py-1 rounded shadow-sm">AI ON</span>
+                </div>
+                
+                <!-- Calibration Status Badge -->
+                <div class="absolute bottom-2 right-2 z-10" id="cal-status-{{ id }}">
+                    <span class="bg-gray-800/90 text-gray-400 text-[10px] font-bold px-2 py-1 rounded border border-gray-700">
+                        ⚠️ Not Calibrated
+                    </span>
+                </div>
+                
+                <!-- Calibration Button (visible on hover) -->
+                <div class="absolute bottom-2 left-2 z-10 opacity-0 group-hover:opacity-100 transition-opacity">
+                    <button onclick="startCalibration('{{ id }}')" 
+                            class="bg-accent/90 hover:bg-accent text-black text-[10px] font-bold px-3 py-1.5 rounded shadow-lg">
+                        📐 Calibrate
+                    </button>
+                </div>
+                
+                <!-- Calibration Overlay -->
+                <div id="cal-overlay-{{ id }}" class="calibration-overlay">
+                    <div class="absolute top-4 left-1/2 transform -translate-x-1/2 bg-black/90 px-4 py-2 rounded-lg border border-accent text-center">
+                        <div class="text-accent font-bold text-sm">Calibration Mode</div>
+                        <div class="text-gray-300 text-xs mt-1" id="cal-instruction-{{ id }}">
+                            Click Top-Left corner (1/4)
+                        </div>
+                        <div class="flex gap-2 mt-2">
+                            <button onclick="saveCalibration('{{ id }}')" id="cal-save-{{ id }}" 
+                                    class="bg-accent text-black text-xs px-3 py-1 rounded font-bold" disabled>
+                                Save
+                            </button>
+                            <button onclick="cancelCalibration('{{ id }}')" 
+                                    class="bg-gray-700 text-white text-xs px-3 py-1 rounded">
+                                Cancel
+                            </button>
+                        </div>
+                    </div>
+                    <canvas id="cal-canvas-{{ id }}" class="w-full h-full"></canvas>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+
+        <!-- MASTER CONTROL -->
+        <div class="bg-card rounded-xl p-5 border border-gray-800 shadow-xl">
+            <h2 class="text-lg font-bold text-white mb-4 flex items-center gap-2">
+                <svg class="w-5 h-5 text-accent" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path></svg>
+                Master Control (All Cams)
+            </h2>
+            
+            <div class="flex flex-col md:flex-row gap-4 items-center justify-between">
+                <div class="grid grid-cols-2 gap-3 w-full md:w-auto">
+                    <select id="global-res" class="bg-gray-800 border border-gray-700 text-sm rounded-lg p-2.5 text-white focus:ring-accent focus:border-accent">
+                        <option value="320,240">Low (320x240)</option>
+                        <option value="512,384" selected>Med (512x384)</option>
+                        <option value="640,480">High (HD)</option>
+                    </select>
+                    <select id="global-fps" class="bg-gray-800 border border-gray-700 text-sm rounded-lg p-2.5 text-white focus:ring-accent focus:border-accent">
+                        <option value="10">10 FPS</option>
+                        <option value="15" selected>15 FPS</option>
+                        <option value="25">25 FPS</option>
+                    </select>
+                </div>
+
+                <div class="flex gap-2 w-full md:w-auto">
+                    <button onclick="sendGlobal('START')" class="flex-1 md:flex-none bg-accent hover:bg-green-500 text-black font-bold py-2.5 px-6 rounded-lg transition transform active:scale-95">
+                        ▶ START ALL
+                    </button>
+                    <button onclick="sendGlobal('STOP')" class="flex-1 md:flex-none bg-danger hover:bg-red-600 text-white font-bold py-2.5 px-6 rounded-lg transition transform active:scale-95">
+                        ⏹ STOP ALL
+                    </button>
+                </div>
+
+                <div class="flex items-center justify-center bg-gray-800 px-4 py-2 rounded-lg border border-gray-700 w-full md:w-auto gap-3">
+                    <span class="text-sm font-bold text-gray-300">🤖 AI ALL</span>
+                    <div class="relative inline-block w-10 mr-2 align-middle select-none">
+                        <input type="checkbox" id="global-ai" class="toggle-checkbox absolute block w-5 h-5 rounded-full bg-white border-4 appearance-none cursor-pointer border-gray-500" onchange="toggleAI('ALL', this.checked)"/>
+                        <label for="global-ai" class="toggle-label block overflow-hidden h-5 rounded-full bg-gray-500 cursor-pointer"></label>
+                    </div>
+                </div>
+            </div>
+
+            <div class="mt-6 pt-4 border-t border-gray-700 flex flex-col md:flex-row items-start md:items-center gap-4">
+                <span class="text-xs font-bold text-orange-400 bg-orange-400/10 px-2 py-1 rounded border border-orange-400/20">⚠️ DANGER ZONE</span>
+                <div class="flex gap-2 w-full md:w-auto overflow-x-auto pb-1">
+                    <button onclick="sys('ALL', 'RESTART_SERVICE')" class="whitespace-nowrap bg-purple-600 hover:bg-purple-700 text-white text-xs font-bold py-2 px-4 rounded">Restart Apps</button>
+                    <button onclick="sys('ALL', 'REBOOT_PI')" class="whitespace-nowrap bg-gray-700 hover:bg-gray-600 border border-gray-600 text-white text-xs font-bold py-2 px-4 rounded">Reboot Pi</button>
+                    <button onclick="sys('ALL', 'SHUTDOWN_PI')" class="whitespace-nowrap bg-black hover:bg-gray-900 border border-red-900 text-red-500 text-xs font-bold py-2 px-4 rounded">Matikan Total</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- INDIVIDUAL SETTINGS with FPS Display -->
+        <h2 class="text-xl font-bold text-gray-300 mt-8 mb-4 px-2">Individual Settings</h2>
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+            {% for id, node in nodes.items() %}
+            <div class="bg-card border border-gray-800 rounded-xl p-4 shadow-md flex flex-col gap-3">
+                <div class="flex justify-between items-start">
+                    <div>
+                        <h3 class="font-bold text-white text-lg">{{ node.label }}</h3>
+                        <p class="text-xs text-gray-500 font-mono">{{ id }}</p>
+                        <!-- FPS Display -->
+                        <div class="flex items-center gap-2 mt-1">
+                            <span class="text-[10px] text-gray-400">FPS:</span>
+                            <span id="fps-{{ id }}" class="text-xs font-bold text-accent">--</span>
+                        </div>
+                    </div>
+                    <div class="flex flex-col items-center">
+                        <div class="relative inline-block w-8 align-middle select-none">
+                            <input type="checkbox" id="ai-{{ id }}" class="toggle-checkbox absolute block w-4 h-4 rounded-full bg-white border-4 appearance-none cursor-pointer border-gray-500" onchange="toggleAI('{{ id }}', this.checked)"/>
+                            <label for="ai-{{ id }}" class="toggle-label block overflow-hidden h-4 rounded-full bg-gray-500 cursor-pointer"></label>
+                        </div>
+                        <span id="ai-txt-{{ id }}" class="text-[10px] text-gray-500 font-bold mt-1">AI OFF</span>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-2 gap-2">
+                    <select id="res-{{ id }}" class="bg-gray-900 text-xs text-white rounded p-2 border border-gray-700">
+                        <option value="320,240">Low</option>
+                        <option value="512,384" selected>Med</option>
+                        <option value="640,480">High</option>
+                    </select>
+                    <select id="fps-config-{{ id }}" class="bg-gray-900 text-xs text-white rounded p-2 border border-gray-700">
+                        <option value="10">10 FPS</option>
+                        <option value="15" selected>15 FPS</option>
+                        <option value="25">25 FPS</option>
+                    </select>
+                </div>
+
+                <div class="grid grid-cols-2 gap-2 mt-auto">
+                    <button onclick="sendSingle('{{ id }}', 'START')" class="bg-gray-700 hover:bg-green-600 text-white text-xs font-bold py-2 rounded">START</button>
+                    <button onclick="sendSingle('{{ id }}', 'STOP')" class="bg-gray-700 hover:bg-red-600 text-white text-xs font-bold py-2 rounded">STOP</button>
+                </div>
+
+                <details class="group">
+                    <summary class="text-[10px] text-gray-500 cursor-pointer hover:text-gray-300 text-center pt-2 border-t border-gray-800 mt-2">
+                        Advanced ▼
+                    </summary>
+                    <div class="flex gap-2 mt-2">
+                        <button onclick="sys('{{ id }}', 'RESTART_SERVICE')" class="flex-1 bg-purple-900/50 hover:bg-purple-800 text-purple-300 text-[10px] py-1.5 rounded border border-purple-900">Restart</button>
+                        <button onclick="sys('{{ id }}', 'REBOOT_PI')" class="flex-1 bg-red-900/50 hover:bg-red-800 text-red-300 text-[10px] py-1.5 rounded border border-red-900">Reboot</button>
+                    </div>
+                </details>
+            </div>
+            {% endfor %}
+        </div>
+
+        <!-- SYSTEM LOGS -->
+        <div class="mt-8">
+            <h3 class="text-xs font-bold text-gray-500 mb-2 uppercase">System Logs</h3>
+            <div id="logs" class="logs h-32 bg-black rounded-lg border border-gray-800 p-3 font-mono text-xs text-green-500 overflow-y-auto">
+                <div>[SYSTEM] Dashboard Ready v2.1</div>
+            </div>
+        </div>
+
+        <div class="text-center text-gray-600 text-xs mt-8">
+            Smart PingPong v2.1 - Web Calibration + FPS Monitor
+        </div>
+    </div>
+
+    <script>
+        // === CALIBRATION STATE ===
+        const calibrationState = {};
+
+        {% for id, node in nodes.items() %}
+        calibrationState['{{ id }}'] = {
+            active: false,
+            points: [],
+            canvas: null,
+            ctx: null,
+            videoRect: null
+        };
+        {% endfor %}
+
+        // === LOGGING ===
+        function log(msg) {
+            const l = document.getElementById('logs');
+            const time = new Date().toLocaleTimeString('id-ID', {hour12: false});
+            l.innerHTML += `<div class="border-b border-gray-900/50 py-0.5"><span class="text-gray-600">[${time}]</span> ${msg}</div>`;
+            l.scrollTop = l.scrollHeight;
+        }
+
+        // === API HELPER ===
+        function api(url, data) {
+            const fd = new FormData();
+            for(let k in data) fd.append(k, data[k]);
+            
+            return fetch(url, {method:'POST', body:fd})
+                .then(r=>r.json())
+                .then(d=> {
+                    log("✅ OK: " + JSON.stringify(d));
+                    return d;
+                })
+                .catch(e=> {
+                    log("❌ Error: " + e);
+                    throw e;
+                });
+        }
+
+        // === CAMERA CONTROL ===
+        function sendGlobal(act) {
+            const res = document.getElementById('global-res').value.split(',');
+            const fps = document.getElementById('global-fps').value;
+            log(`🚀 Broadcasting ${act} ALL...`);
+            api('/api/control', {target:'ALL', action:act, width:res[0], height:res[1], fps:fps});
+            if(act==='START') setTimeout(refreshImages, 1000);
+        }
+
+        function sendSingle(tgt, act) {
+            const res = document.getElementById('res-'+tgt).value.split(',');
+            const fps = document.getElementById('fps-config-'+tgt).value;
+            log(`📡 ${act} → ${tgt}`);
+            api('/api/control', {target:tgt, action:act, width:res[0], height:res[1], fps:fps});
+            if(act==='START') setTimeout(refreshImages, 1000);
+        }
+
+        function toggleAI(tgt, status) {
+            log(`🤖 AI ${tgt}: ${status?"ON":"OFF"}`);
+            api('/api/toggle_ai', {target:tgt, status:status});
+            
+            if(tgt !== 'ALL') {
+                const lbl = document.getElementById('ai-txt-'+tgt);
+                const badge = document.getElementById('badge-ai-'+tgt);
+                lbl.innerText = status ? "AI ON" : "AI OFF";
+                lbl.className = status ? "text-[10px] font-bold mt-1 text-blue-400" : "text-[10px] font-bold mt-1 text-gray-500";
+                if(badge) badge.style.display = status ? 'block' : 'none';
+            }
+        }
+
+        function sys(tgt, act) {
+            if(confirm(`⚠️ ${act} on ${tgt}?`)) {
+                log(`⚡ SYSTEM: ${act} → ${tgt}`);
+                api('/api/control', {target:tgt, action:act, width:320, height:240, fps:15});
+            }
+        }
+
+        function refreshImages() {
+            document.querySelectorAll('img[id^="video-"]').forEach(img => {
+                let s = img.src;
+                img.src = '';
+                setTimeout(() => img.src = s, 100);
+            });
+        }
+
+        // === WEB CALIBRATION ===
+        function startCalibration(camId) {
+            const state = calibrationState[camId];
+            const overlay = document.getElementById('cal-overlay-' + camId);
+            const canvas = document.getElementById('cal-canvas-' + camId);
+            const video = document.getElementById('video-' + camId);
+            
+            // Reset state
+            state.active = true;
+            state.points = [];
+            state.canvas = canvas;
+            state.ctx = canvas.getContext('2d');
+            state.videoRect = video.getBoundingClientRect();
+            
+            // Setup canvas
+            canvas.width = state.videoRect.width;
+            canvas.height = state.videoRect.height;
+            
+            // Show overlay
+            overlay.style.display = 'block';
+            
+            // Update instruction
+            updateCalibrationInstruction(camId);
+            
+            // Add click listener
+            canvas.addEventListener('click', (e) => handleCalibrationClick(e, camId));
+            
+            log(`📐 Calibration started: ${camId}`);
+        }
+
+        function handleCalibrationClick(e, camId) {
+            const state = calibrationState[camId];
+            if (!state.active) return;
+            
+            const rect = state.canvas.getBoundingClientRect();
+            const x = e.clientX - rect.left;
+            const y = e.clientY - rect.top;
+            
+            // Add point
+            state.points.push({x, y});
+            
+            // Draw point
+            drawCalibrationPoints(camId);
+            
+            // Update instruction
+            updateCalibrationInstruction(camId);
+            
+            // Enable save button if 4 points
+            if (state.points.length === 4) {
+                document.getElementById('cal-save-' + camId).disabled = false;
+            }
+        }
+
+        function drawCalibrationPoints(camId) {
+            const state = calibrationState[camId];
+            const ctx = state.ctx;
+            
+            // Clear canvas
+            ctx.clearRect(0, 0, state.canvas.width, state.canvas.height);
+            
+            // Draw semi-transparent overlay
+            ctx.fillStyle = 'rgba(0, 0, 0, 0.5)';
+            ctx.fillRect(0, 0, state.canvas.width, state.canvas.height);
+            
+            // Draw points
+            state.points.forEach((pt, i) => {
+                ctx.beginPath();
+                ctx.arc(pt.x, pt.y, 10, 0, 2 * Math.PI);
+                ctx.fillStyle = '#00e676';
+                ctx.fill();
+                ctx.strokeStyle = 'white';
+                ctx.lineWidth = 3;
+                ctx.stroke();
+                
+                // Draw label
+                ctx.fillStyle = 'white';
+                ctx.font = 'bold 14px sans-serif';
+                ctx.fillText((i+1).toString(), pt.x - 4, pt.y + 5);
+            });
+            
+            // Draw lines connecting points
+            if (state.points.length > 1) {
+                ctx.beginPath();
+                ctx.moveTo(state.points[0].x, state.points[0].y);
+                for (let i = 1; i < state.points.length; i++) {
+                    ctx.lineTo(state.points[i].x, state.points[i].y);
+                }
+                if (state.points.length === 4) {
+                    ctx.closePath();
+                }
+                ctx.strokeStyle = '#00e676';
+                ctx.lineWidth = 2;
+                ctx.stroke();
+            }
+        }
+
+        function updateCalibrationInstruction(camId) {
+            const state = calibrationState[camId];
+            const instruction = document.getElementById('cal-instruction-' + camId);
+            
+            const labels = [
+                'Click Top-Left corner (1/4)',
+                'Click Top-Right corner (2/4)',
+                'Click Bottom-Right corner (3/4)',
+                'Click Bottom-Left corner (4/4)',
+                'Ready to save! ✓'
+            ];
+            
+            instruction.textContent = labels[state.points.length];
+        }
+
+        function saveCalibration(camId) {
+            const state = calibrationState[camId];
+            
+            if (state.points.length !== 4) {
+                alert('Need 4 points!');
+                return;
+            }
+            
+            log(`💾 Saving calibration: ${camId}...`);
+            
+            // Send to server
+            api('/api/calibrate', {
+                camera_id: camId,
+                corners: JSON.stringify(state.points)
+            }).then(result => {
+                if (result.success) {
+                    log(`✅ Calibration saved: ${camId}`);
+                    updateCalibrationStatus(camId, true);
+                    cancelCalibration(camId);
+                } else {
+                    log(`❌ Calibration failed: ${result.error}`);
+                }
+            });
+        }
+
+        function cancelCalibration(camId) {
+            const state = calibrationState[camId];
+            const overlay = document.getElementById('cal-overlay-' + camId);
+            
+            state.active = false;
+            state.points = [];
+            overlay.style.display = 'none';
+            
+            document.getElementById('cal-save-' + camId).disabled = true;
+        }
+
+        function updateCalibrationStatus(camId, calibrated) {
+            const badge = document.getElementById('cal-status-' + camId);
+            
+            if (calibrated) {
+                badge.innerHTML = '<span class="bg-green-600/90 text-white text-[10px] font-bold px-2 py-1 rounded border border-green-500">✓ Calibrated</span>';
+            } else {
+                badge.innerHTML = '<span class="bg-gray-800/90 text-gray-400 text-[10px] font-bold px-2 py-1 rounded border border-gray-700">⚠️ Not Calibrated</span>';
+            }
+        }
+
+        // === FPS MONITORING ===
+        function updateFPS() {
+            {% for id, node in nodes.items() %}
+            fetch('/api/fps/{{ id }}')
+                .then(r => r.json())
+                .then(data => {
+                    const fpsEl = document.getElementById('fps-{{ id }}');
+                    if (data.fps !== null) {
+                        fpsEl.textContent = data.fps.toFixed(1);
+                        
+                        // Color based on FPS
+                        if (data.fps >= 12) {
+                            fpsEl.className = 'text-xs font-bold text-accent';
+                        } else if (data.fps >= 8) {
+                            fpsEl.className = 'text-xs font-bold text-yellow-500';
+                        } else {
+                            fpsEl.className = 'text-xs font-bold text-red-500';
+                        }
+                    } else {
+                        fpsEl.textContent = '--';
+                        fpsEl.className = 'text-xs font-bold text-gray-600';
+                    }
+                })
+                .catch(e => {
+                    document.getElementById('fps-{{ id }}').textContent = '--';
+                });
+            {% endfor %}
+        }
+
+        // === CHECK CALIBRATION STATUS ON LOAD ===
+        function checkCalibrationStatus() {
+            {% for id, node in nodes.items() %}
+            fetch('/api/calibration_status/{{ id }}')
+                .then(r => r.json())
+                .then(data => {
+                    updateCalibrationStatus('{{ id }}', data.calibrated);
+                })
+                .catch(e => console.error('Calibration status check failed:', e));
+            {% endfor %}
+        }
+
+        // === INITIALIZATION ===
+        window.addEventListener('load', () => {
+            log('✅ Dashboard v2.1 loaded');
+            checkCalibrationStatus();
+            
+            // Update FPS every 2 seconds
+            setInterval(updateFPS, 2000);
+            updateFPS();
+        });
+    </script>
+</body>
+</html>
