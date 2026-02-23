@@ -1,4 +1,3 @@
-
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -147,24 +146,12 @@
             </h2>
             
             <div class="flex flex-col md:flex-row gap-4 items-center justify-between">
-                <div class="grid grid-cols-2 gap-3 w-full md:w-auto">
-                    <select id="global-res" class="bg-gray-800 border border-gray-700 text-sm rounded-lg p-2.5 text-white focus:ring-accent focus:border-accent">
-                        <option value="320,240">Low (320x240)</option>
-                        <option value="512,384" selected>Med (512x384)</option>
-                        <option value="640,480">High (HD)</option>
-                    </select>
-                    <select id="global-fps" class="bg-gray-800 border border-gray-700 text-sm rounded-lg p-2.5 text-white focus:ring-accent focus:border-accent">
-                        <option value="10">10 FPS</option>
-                        <option value="15" selected>15 FPS</option>
-                        <option value="25">25 FPS</option>
-                    </select>
-                </div>
-
-                <div class="flex gap-2 w-full md:w-auto">
-                    <button onclick="sendGlobal('START')" class="flex-1 md:flex-none bg-accent hover:bg-green-500 text-black font-bold py-2.5 px-6 rounded-lg transition transform active:scale-95">
+                
+                <div class="flex gap-2 w-full md:w-1/2">
+                    <button onclick="sendGlobal('START')" class="flex-1 bg-accent hover:bg-green-500 text-black font-bold py-2.5 px-6 rounded-lg transition transform active:scale-95">
                         ▶ START ALL
                     </button>
-                    <button onclick="sendGlobal('STOP')" class="flex-1 md:flex-none bg-danger hover:bg-red-600 text-white font-bold py-2.5 px-6 rounded-lg transition transform active:scale-95">
+                    <button onclick="sendGlobal('STOP')" class="flex-1 bg-danger hover:bg-red-600 text-white font-bold py-2.5 px-6 rounded-lg transition transform active:scale-95">
                         ⏹ STOP ALL
                     </button>
                 </div>
@@ -212,27 +199,14 @@
                     </div>
                 </div>
 
-                <div class="grid grid-cols-2 gap-2">
-                    <select id="res-{{ id }}" class="bg-gray-900 text-xs text-white rounded p-2 border border-gray-700">
-                        <option value="320,240">Low</option>
-                        <option value="512,384" selected>Med</option>
-                        <option value="640,480">High</option>
-                    </select>
-                    <select id="fps-config-{{ id }}" class="bg-gray-900 text-xs text-white rounded p-2 border border-gray-700">
-                        <option value="10">10 FPS</option>
-                        <option value="15" selected>15 FPS</option>
-                        <option value="25">25 FPS</option>
-                    </select>
-                </div>
-
-                <div class="grid grid-cols-2 gap-2 mt-auto">
+                <div class="grid grid-cols-2 gap-2 mt-auto pt-2">
                     <button onclick="sendSingle('{{ id }}', 'START')" class="bg-gray-700 hover:bg-green-600 text-white text-xs font-bold py-2 rounded">START</button>
                     <button onclick="sendSingle('{{ id }}', 'STOP')" class="bg-gray-700 hover:bg-red-600 text-white text-xs font-bold py-2 rounded">STOP</button>
                 </div>
 
                 <details class="group">
                     <summary class="text-[10px] text-gray-500 cursor-pointer hover:text-gray-300 text-center pt-2 border-t border-gray-800 mt-2">
-                        Advanced ▼
+                        Advanced
                     </summary>
                     <div class="flex gap-2 mt-2">
                         <button onclick="sys('{{ id }}', 'RESTART_SERVICE')" class="flex-1 bg-purple-900/50 hover:bg-purple-800 text-purple-300 text-[10px] py-1.5 rounded border border-purple-900">Restart</button>
@@ -252,7 +226,7 @@
         </div>
 
         <div class="text-center text-gray-600 text-xs mt-8">
-            Smart PingPong v2.1 - Web Calibration + FPS Monitor
+            Smart PingPong v2.1 - uStreamer Integrated
         </div>
     </div>
 
@@ -295,21 +269,19 @@
                 });
         }
 
-        // === CAMERA CONTROL ===
+        // === CAMERA CONTROL (DIPERBARUI) ===
         function sendGlobal(act) {
-            const res = document.getElementById('global-res').value.split(',');
-            const fps = document.getElementById('global-fps').value;
             log(`🚀 Broadcasting ${act} ALL...`);
-            api('/api/control', {target:'ALL', action:act, width:res[0], height:res[1], fps:fps});
-            if(act==='START') setTimeout(refreshImages, 1000);
+            // Mengubah menjadi huruf kecil agar "START" menjadi "start"
+            api('/api/control', {target:'ALL', action: act.toLowerCase()});
+            if(act==='START') setTimeout(refreshImages, 2500); 
         }
 
         function sendSingle(tgt, act) {
-            const res = document.getElementById('res-'+tgt).value.split(',');
-            const fps = document.getElementById('fps-config-'+tgt).value;
             log(`📡 ${act} → ${tgt}`);
-            api('/api/control', {target:tgt, action:act, width:res[0], height:res[1], fps:fps});
-            if(act==='START') setTimeout(refreshImages, 1000);
+            // Mengubah menjadi huruf kecil agar sesuai dengan cmd.py Raspi
+            api('/api/control', {target:tgt, action: act.toLowerCase()});
+            if(act==='START') setTimeout(refreshImages, 2500);
         }
 
         function toggleAI(tgt, status) {
@@ -328,43 +300,38 @@
         function sys(tgt, act) {
             if(confirm(`⚠️ ${act} on ${tgt}?`)) {
                 log(`⚡ SYSTEM: ${act} → ${tgt}`);
-                api('/api/control', {target:tgt, action:act, width:320, height:240, fps:15});
+                // Mengubah action "REBOOT_PI" menjadi "reboot_pi" dsb.
+                api('/api/control', {target:tgt, action: act.toLowerCase()});
             }
         }
 
         function refreshImages() {
             document.querySelectorAll('img[id^="video-"]').forEach(img => {
                 let s = img.src;
+                let cleanSrc = s.split('?')[0]; 
                 img.src = '';
-                setTimeout(() => img.src = s, 100);
+                setTimeout(() => img.src = cleanSrc + '?t=' + new Date().getTime(), 100);
             });
         }
 
-        // === WEB CALIBRATION ===
+        // === WEB CALIBRATION (TIDAK DIUBAH) ===
         function startCalibration(camId) {
             const state = calibrationState[camId];
             const overlay = document.getElementById('cal-overlay-' + camId);
             const canvas = document.getElementById('cal-canvas-' + camId);
             const video = document.getElementById('video-' + camId);
             
-            // Reset state
             state.active = true;
             state.points = [];
             state.canvas = canvas;
             state.ctx = canvas.getContext('2d');
             state.videoRect = video.getBoundingClientRect();
             
-            // Setup canvas
             canvas.width = state.videoRect.width;
             canvas.height = state.videoRect.height;
             
-            // Show overlay
             overlay.style.display = 'block';
-            
-            // Update instruction
             updateCalibrationInstruction(camId);
-            
-            // Add click listener
             canvas.addEventListener('click', (e) => handleCalibrationClick(e, camId));
             
             log(`📐 Calibration started: ${camId}`);
@@ -374,20 +341,41 @@
             const state = calibrationState[camId];
             if (!state.active) return;
             
+            const video = document.getElementById('video-' + camId);
             const rect = state.canvas.getBoundingClientRect();
-            const x = e.clientX - rect.left;
-            const y = e.clientY - rect.top;
             
-            // Add point
-            state.points.push({x, y});
+            const clickX = e.clientX - rect.left;
+            const clickY = e.clientY - rect.top;
             
-            // Draw point
+            const naturalW = video.naturalWidth;
+            const naturalH = video.naturalHeight;
+            
+            const scale = Math.min(rect.width / naturalW, rect.height / naturalH);
+            
+            const drawW = naturalW * scale;
+            const drawH = naturalH * scale;
+            
+            const offsetX = (rect.width - drawW) / 2;
+            const offsetY = (rect.height - drawH) / 2;
+            
+            let realX = (clickX - offsetX) / scale;
+            let realY = (clickY - offsetY) / scale;
+            
+            if(realX < 0) realX = 0;
+            if(realY < 0) realY = 0;
+            if(realX > naturalW) realX = naturalW;
+            if(realY > naturalH) realY = naturalH;
+
+            state.points.push({
+                x: clickX, 
+                y: clickY, 
+                realX: realX, 
+                realY: realY
+            });
+            
             drawCalibrationPoints(camId);
-            
-            // Update instruction
             updateCalibrationInstruction(camId);
             
-            // Enable save button if 4 points
             if (state.points.length === 4) {
                 document.getElementById('cal-save-' + camId).disabled = false;
             }
@@ -397,14 +385,11 @@
             const state = calibrationState[camId];
             const ctx = state.ctx;
             
-            // Clear canvas
             ctx.clearRect(0, 0, state.canvas.width, state.canvas.height);
             
-            // Draw semi-transparent overlay
             ctx.fillStyle = 'rgba(0, 0, 0, 0.5)';
             ctx.fillRect(0, 0, state.canvas.width, state.canvas.height);
             
-            // Draw points
             state.points.forEach((pt, i) => {
                 ctx.beginPath();
                 ctx.arc(pt.x, pt.y, 10, 0, 2 * Math.PI);
@@ -414,13 +399,11 @@
                 ctx.lineWidth = 3;
                 ctx.stroke();
                 
-                // Draw label
                 ctx.fillStyle = 'white';
                 ctx.font = 'bold 14px sans-serif';
                 ctx.fillText((i+1).toString(), pt.x - 4, pt.y + 5);
             });
             
-            // Draw lines connecting points
             if (state.points.length > 1) {
                 ctx.beginPath();
                 ctx.moveTo(state.points[0].x, state.points[0].y);
@@ -455,23 +438,24 @@
             const state = calibrationState[camId];
             
             if (state.points.length !== 4) {
-                alert('Need 4 points!');
+                alert('Butuh 4 titik!');
                 return;
             }
             
-            log(`💾 Saving calibration: ${camId}...`);
+            log(`💾 Menyimpan kalibrasi: ${camId}...`);
             
-            // Send to server
+            const realPoints = state.points.map(pt => ({ x: pt.realX, y: pt.realY }));
+            
             api('/api/calibrate', {
                 camera_id: camId,
-                corners: JSON.stringify(state.points)
+                corners: JSON.stringify(realPoints)
             }).then(result => {
                 if (result.success) {
-                    log(`✅ Calibration saved: ${camId}`);
+                    log(`✅ Kalibrasi tersimpan: ${camId}`);
                     updateCalibrationStatus(camId, true);
                     cancelCalibration(camId);
                 } else {
-                    log(`❌ Calibration failed: ${result.error}`);
+                    log(`❌ Kalibrasi gagal: ${result.error}`);
                 }
             });
         }
@@ -497,7 +481,7 @@
             }
         }
 
-        // === FPS MONITORING ===
+        // === FPS MONITORING (TIDAK DIUBAH) ===
         function updateFPS() {
             {% for id, node in nodes.items() %}
             fetch('/api/fps/{{ id }}')

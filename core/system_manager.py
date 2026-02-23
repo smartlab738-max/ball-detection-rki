@@ -16,7 +16,10 @@ class SystemManager:
             cfg = json.load(f)
         
         # Path model YOLOv8
-        model_path = os.path.join(self.base_path, 'models', 'best.pt')
+        # model_path = os.path.join(self.base_path, 'models', 'best.pt')
+        
+        # Path model openvino
+        model_path = os.path.join(self.base_path, 'models', 'best_openvino_model')
 
         for nid, c in cfg.items():
             # Inisialisasi AIProcessor unik untuk setiap ID kamera

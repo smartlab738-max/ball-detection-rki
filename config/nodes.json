@@ -1,22 +1,22 @@
 {
     "CAM-1": {
         "ip": "192.168.137.101",
-        "video_port": 9991,
+        "video_port": 8080,
         "label": "Depan (Main)"
     },
     "CAM-2": {
         "ip": "192.168.137.102",
-        "video_port": 9992,
+        "video_port": 8080,
         "label": "Belakang"
     },
     "CAM-3": {
         "ip": "192.168.137.103",
-        "video_port": 9993,
+        "video_port": 8080,
         "label": "Samping Kiri"
     },
     "CAM-4": {
         "ip": "192.168.137.104",
-        "video_port": 9994,
+        "video_port": 8080,
         "label": "Samping Kanan"
     }
 }

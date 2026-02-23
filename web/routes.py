@@ -2,6 +2,8 @@ from flask import Blueprint, render_template, Response, request, jsonify
 import time
 import cv2
 import numpy as np
+import json
+import os
 
 bp = Blueprint('main', __name__)
 manager = None
@@ -13,9 +15,14 @@ def init_routes(app, mgr):
 
 @bp.route('/')
 def index():
+    # Menampilkan halaman utama dashboard
     return render_template('dashboard.html', nodes=manager.get_all_nodes())
 
 def gen(nid):
+    """
+    Generator untuk stream video. 
+    Mengambil frame berupa bytes JPEG dari CameraNode.
+    """
     node = manager.get_node(nid)
     while True:
         frame = node.get_frame() if node else None
@@ -27,20 +34,28 @@ def gen(nid):
 
 @bp.route('/video_feed/<nid>')
 def video_feed(nid):
+    """Endpoint URL untuk tag <img> di HTML"""
     return Response(gen(nid), mimetype='multipart/x-mixed-replace; boundary=frame')
 
 @bp.route('/api/control', methods=['POST'])
 def control():
+    """
+    Endpoint untuk tombol Start/Stop Kamera.
+    Akan meneruskan perintah ke port 8000 di Raspberry Pi (cmd_listener.py)
+    """
     tgt = request.form.get('target')
     act = request.form.get('action')
-    w = int(request.form.get('width', 512))
-    h = int(request.form.get('height', 384))
-    fps = int(request.form.get('fps', 15))
+    
+    # Beri nilai default 0 karena uStreamer sudah mengunci resolusi dan FPS
+    w = int(request.form.get('width', 0))
+    h = int(request.form.get('height', 0))
+    fps = int(request.form.get('fps', 0))
 
     if tgt == 'ALL': 
         res = manager.broadcast_command(act, w, h, fps)
     else: 
         res = manager.single_command(tgt, act, w, h, fps)
+        
     return jsonify(res)
 
 @bp.route('/api/toggle_ai', methods=['POST'])
@@ -108,7 +123,6 @@ def toggle_zone_grid(nid):
         return jsonify({"success": True})
     return jsonify({"success": False}), 404
 
-
 @bp.route('/api/calibrate', methods=['POST'])
 def calibrate_camera():
     """
@@ -163,7 +177,6 @@ def calibrate_camera():
         traceback.print_exc()
         return jsonify({"success": False, "error": str(e)}), 500
 
-
 @bp.route('/api/calibration_status/<nid>')
 def get_calibration_status(nid):
     """
@@ -177,7 +190,6 @@ def get_calibration_status(nid):
         "calibrated": calibrated,
         "path": cal_path if calibrated else None
     })
-
 
 # === FPS MONITORING ENDPOINT ===
 @bp.route('/api/fps/<nid>')
