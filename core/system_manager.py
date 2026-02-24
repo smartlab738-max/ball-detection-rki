@@ -15,11 +15,11 @@ class SystemManager:
         with open(path, 'r') as f:
             cfg = json.load(f)
         
-        # Path model YOLOv8
-        # model_path = os.path.join(self.base_path, 'models', 'best.pt')
-        
         # Path model openvino
         model_path = os.path.join(self.base_path, 'models', 'best_openvino_model')
+        
+        # Path model YOLOv8
+        # model_path = os.path.join(self.base_path, 'models', 'best.pt')
 
         for nid, c in cfg.items():
             # Inisialisasi AIProcessor unik untuk setiap ID kamera
@@ -27,6 +27,8 @@ class SystemManager:
             
             # Buat instance CameraNode dengan AI lokalnya
             node = CameraNode(nid, c, local_ai)
+            
+            # Mulai menangkap video
             node.start_receiver()
             self.nodes[nid] = node
 
@@ -36,20 +38,49 @@ class SystemManager:
     def get_node(self, nid): 
         return self.nodes.get(nid)
 
-    # --- FUNGSI KONTROL YANG ERROR TADI ---
+    def stop_all(self):
+        """Fungsi utilitas untuk mematikan semua thread saat aplikasi Flask ditutup."""
+        for node in self.nodes.values():
+            node.stop_receiver()
+
+    # --- FUNGSI KONTROL YANG SUDAH DI-OPTIMASI ---
 
     def broadcast_command(self, action, w, h, fps):
-        """Mengirim perintah ke SEMUA node kamera."""
+        """Mengirim perintah ke SEMUA node kamera dan mengatur thread lokal."""
         res = {}
+        act_lower = action.lower()
+        
         for nid, node in self.nodes.items():
+            # 1. Kirim perintah ke Raspberry Pi via TCP
             res[nid] = node.send_command(action, w, h, fps)
+            
+            # 2. Manajemen Thread Lokal (Optimasi 3)
+            if act_lower in ['stop', 'restart_service', 'reboot_pi', 'shutdown_pi']:
+                node.stop_receiver() # Matikan proses pembacaan video di laptop
+            elif act_lower == 'start':
+                if not node.running:
+                    node.start_receiver() # Hidupkan kembali jika sebelumnya mati
+                    
         return res
 
     def single_command(self, nid, action, w, h, fps):
-        """Mengirim perintah ke SATU node kamera tertentu."""
+        """Mengirim perintah ke SATU node kamera tertentu dan mengatur thread lokal."""
         node = self.nodes.get(nid)
+        act_lower = action.lower()
+        
         if node:
-            return {nid: node.send_command(action, w, h, fps)}
+            # 1. Kirim perintah ke Raspberry Pi via TCP
+            response = node.send_command(action, w, h, fps)
+            
+            # 2. Manajemen Thread Lokal (Optimasi 3)
+            if act_lower in ['stop', 'restart_service', 'reboot_pi', 'shutdown_pi']:
+                node.stop_receiver() # Matikan proses pembacaan video di laptop
+            elif act_lower == 'start':
+                if not node.running:
+                    node.start_receiver() # Hidupkan kembali jika sebelumnya mati
+                    
+            return {nid: response}
+            
         return {nid: "Not Found"}
 
     def set_ai_mode(self, target, enabled):

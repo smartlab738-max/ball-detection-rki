@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>🏓 Smart PingPong Admin v2.1</title>
+    <title>🏓 Smart PingPong Admin v2.2</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script>
         tailwind.config = {
@@ -69,9 +69,12 @@
     <div class="max-w-6xl mx-auto flex justify-between items-center mb-6 border-b border-gray-800 pb-4">
         <div>
             <h1 class="text-2xl md:text-3xl font-bold text-accent tracking-tight">🏓 Smart PingPong</h1>
-            <p class="text-xs text-gray-500 mt-1">Admin Control Center v2.1</p>
+            <p class="text-xs text-gray-500 mt-1">Admin Control Center v2.2</p>
         </div>
         <div class="flex items-center gap-2">
+            <button onclick="openVarRoom()" class="bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold py-2 px-4 rounded shadow-lg flex items-center gap-2 transition transform active:scale-95">
+                <span>📼</span> Buka Ruang VAR
+            </button>
             <span class="w-2 h-2 rounded-full bg-green-500 animate-pulse"></span>
             <span class="text-xs font-mono text-gray-400">ONLINE</span>
         </div>
@@ -106,11 +109,15 @@
                     </span>
                 </div>
                 
-                <!-- Calibration Button (visible on hover) -->
-                <div class="absolute bottom-2 left-2 z-10 opacity-0 group-hover:opacity-100 transition-opacity">
+                <!-- Calibration Buttons (Auto & Manual) -->
+                <div class="absolute bottom-2 left-2 z-10 opacity-0 group-hover:opacity-100 transition-opacity flex gap-2">
                     <button onclick="startCalibration('{{ id }}')" 
-                            class="bg-accent/90 hover:bg-accent text-black text-[10px] font-bold px-3 py-1.5 rounded shadow-lg">
-                        📐 Calibrate
+                            class="bg-accent/90 hover:bg-accent text-black text-[10px] font-bold px-3 py-1.5 rounded shadow-lg" title="Kalibrasi Manual (Klik 4 Sudut)">
+                        📐 Manual
+                    </button>
+                    <button onclick="autoCalibrate('{{ id }}')" 
+                            class="bg-blue-500/90 hover:bg-blue-400 text-white text-[10px] font-bold px-3 py-1.5 rounded shadow-lg" title="Cari Meja Otomatis">
+                        🪄 Auto
                     </button>
                 </div>
                 
@@ -202,6 +209,11 @@
                 <div class="grid grid-cols-2 gap-2 mt-auto pt-2">
                     <button onclick="sendSingle('{{ id }}', 'START')" class="bg-gray-700 hover:bg-green-600 text-white text-xs font-bold py-2 rounded">START</button>
                     <button onclick="sendSingle('{{ id }}', 'STOP')" class="bg-gray-700 hover:bg-red-600 text-white text-xs font-bold py-2 rounded">STOP</button>
+                    
+                    <!-- TOMBOL VAR BARU -->
+                    <button onclick="saveVAR('{{ id }}')" class="col-span-2 bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold py-2 rounded mt-1 flex justify-center items-center gap-2 transition active:scale-95">
+                        <span></span> Save VAR Replay (5s)
+                    </button>
                 </div>
 
                 <details class="group">
@@ -221,12 +233,45 @@
         <div class="mt-8">
             <h3 class="text-xs font-bold text-gray-500 mb-2 uppercase">System Logs</h3>
             <div id="logs" class="logs h-32 bg-black rounded-lg border border-gray-800 p-3 font-mono text-xs text-green-500 overflow-y-auto">
-                <div>[SYSTEM] Dashboard Ready v2.1</div>
+                <div>[SYSTEM] Dashboard Ready v2.2</div>
             </div>
         </div>
 
         <div class="text-center text-gray-600 text-xs mt-8">
-            Smart PingPong v2.1 - uStreamer Integrated
+            Smart PingPong v2.2 - VAR & Auto-Detect Integrated
+        </div>
+    </div>
+
+    <div id="var-modal" class="hidden fixed inset-0 bg-black/95 z-[100] flex-col items-center justify-center p-4">
+        <div class="w-full max-w-5xl bg-card border border-gray-800 rounded-xl overflow-hidden shadow-2xl flex flex-col max-h-[90vh]">
+            
+            <!-- Modal Header -->
+            <div class="flex justify-between items-center p-4 border-b border-gray-800 bg-gray-900">
+                <h2 class="text-lg font-bold text-white flex items-center gap-2"><span>📼</span> Ruang Putar Ulang VAR</h2>
+                <button onclick="closeVarRoom()" class="text-gray-400 hover:text-white text-3xl font-bold transition">&times;</button>
+            </div>
+            
+            <div class="flex flex-col md:flex-row flex-1 overflow-hidden">
+                <!-- Video Player -->
+                <div class="flex-1 bg-black flex items-center justify-center border-b md:border-b-0 md:border-r border-gray-800 relative min-h-[40vh] p-4">
+                    <video id="var-player" controls class="max-w-full max-h-[60vh] outline-none shadow-lg">
+                        <source src="" type="video/mp4">
+                        Browser Anda tidak mendukung pemutar video.
+                    </video>
+                    <p id="var-placeholder" class="text-gray-500 text-sm absolute">Pilih klip video dari daftar di samping 👉</p>
+                </div>
+                
+                <!-- Playlist (Daftar Video) -->
+                <div class="w-full md:w-72 bg-gray-900 flex flex-col">
+                    <div class="p-3 text-xs font-bold text-gray-400 uppercase tracking-wider border-b border-gray-800 bg-gray-950 flex justify-between items-center">
+                        <span>Daftar Klip</span>
+                        <button onclick="loadVarList()" class="text-blue-400 hover:text-blue-300">↻ Refresh</button>
+                    </div>
+                    <div id="var-list" class="flex-1 overflow-y-auto p-3 space-y-2">
+                        <!-- List Video akan dimunculkan oleh JavaScript -->
+                    </div>
+                </div>
+            </div>
         </div>
     </div>
 
@@ -314,7 +359,78 @@
             });
         }
 
-        // === WEB CALIBRATION (TIDAK DIUBAH) ===
+        function openVarRoom() {
+            const modal = document.getElementById('var-modal');
+            modal.classList.remove('hidden');
+            modal.classList.add('flex');
+            loadVarList();
+        }
+
+        function closeVarRoom() {
+            const modal = document.getElementById('var-modal');
+            modal.classList.add('hidden');
+            modal.classList.remove('flex');
+            
+            // Hentikan video saat popup ditutup
+            const player = document.getElementById('var-player');
+            player.pause();
+            player.src = "";
+            document.getElementById('var-placeholder').style.display = 'block';
+        }
+
+        function loadVarList() {
+            const listEl = document.getElementById('var-list');
+            listEl.innerHTML = '<div class="text-center text-gray-500 text-xs mt-4">Memuat klip...</div>';
+            
+            fetch('/api/var/list')
+                .then(r => r.json())
+                .then(files => {
+                    if(files.length === 0) {
+                        listEl.innerHTML = '<div class="text-center text-gray-600 text-xs mt-4 p-4 bg-gray-900 rounded border border-gray-800">Belum ada klip tersimpan.<br><br>Klik tombol "Save VAR" pada panel kamera.</div>';
+                        return;
+                    }
+                    
+                    listEl.innerHTML = '';
+                    files.forEach(file => {
+                        const btn = document.createElement('button');
+                        btn.className = 'w-full text-left p-3 rounded bg-gray-800 hover:bg-blue-900 border border-gray-700 transition flex items-center gap-3';
+                        btn.innerHTML = `
+                            <div class="bg-black p-2 rounded"><span class="text-lg">🎥</span></div>
+                            <div class="flex-1 truncate">
+                                <div class="text-xs text-blue-300 font-bold truncate">${file}</div>
+                                <div class="text-[10px] text-gray-500 mt-1">Slow Motion (5 FPS)</div>
+                            </div>
+                        `;
+                        btn.onclick = () => playVarVideo(file);
+                        listEl.appendChild(btn);
+                    });
+                })
+                .catch(e => {
+                    listEl.innerHTML = '<div class="text-center text-red-500 text-xs mt-4">Gagal memuat daftar klip</div>';
+                });
+        }
+
+        function playVarVideo(filename) {
+            const player = document.getElementById('var-player');
+            const placeholder = document.getElementById('var-placeholder');
+            
+            placeholder.style.display = 'none';
+            player.src = `/var_clips/${filename}`;
+            player.play();
+        }
+
+        function saveVAR(camId) {
+            log(`📼 Memproses video VAR untuk ${camId}...`);
+            fetch(`/api/var/save/${camId}`, { method: 'POST' })
+            .then(r => r.json()).then(data => {
+                if(data.success) {
+                    log(`✅ SUKSES: ${data.message}`);
+                    alert(data.message + "\n\nKlip siap ditonton di Ruang VAR!");
+                } else { alert(data.message); }
+            });
+        }
+
+        // === WEB CALIBRATION (MANUAL) ===
         function startCalibration(camId) {
             const state = calibrationState[camId];
             const overlay = document.getElementById('cal-overlay-' + camId);
@@ -454,6 +570,7 @@
                     log(`✅ Kalibrasi tersimpan: ${camId}`);
                     updateCalibrationStatus(camId, true);
                     cancelCalibration(camId);
+                    setTimeout(refreshImages, 500); // Reload image to show new lines
                 } else {
                     log(`❌ Kalibrasi gagal: ${result.error}`);
                 }
@@ -471,6 +588,40 @@
             document.getElementById('cal-save-' + camId).disabled = true;
         }
 
+        // === FUNGSI AUTO CALIBRATE ===
+        function autoCalibrate(camId) {
+            if(!confirm(`Jalankan Deteksi Meja Otomatis untuk ${camId}? \n\nPastikan meja terlihat utuh di layar.`)) return;
+
+            log(`🪄 Memulai Auto-Calibration untuk ${camId}...`);
+            
+            const btn = event.currentTarget;
+            const originalText = btn.innerHTML;
+            btn.innerHTML = '⏳ Proses...';
+
+            fetch(`/api/calibrate/auto/${camId}`, {
+                method: 'POST'
+            })
+            .then(response => response.json())
+            .then(data => {
+                btn.innerHTML = originalText;
+                if(data.success) {
+                    log(`✅ SUKSES: ${data.message}`);
+                    updateCalibrationStatus(camId, true);
+                    alert("Kalibrasi Otomatis Berhasil! Garis meja sudah diperbarui.");
+                    
+                    setTimeout(refreshImages, 500); 
+                } else {
+                    log(`❌ GAGAL: ${data.message}`);
+                    alert("Gagal mendeteksi meja secara otomatis.\nCahaya mungkin kurang, atau tiang net menghalangi.\n\nSilakan gunakan mode 📐 Manual.");
+                }
+            })
+            .catch(error => {
+                btn.innerHTML = originalText;
+                console.error('Error:', error);
+                log(`❌ Error jaringan saat kalibrasi otomatis`);
+            });
+        }
+
         function updateCalibrationStatus(camId, calibrated) {
             const badge = document.getElementById('cal-status-' + camId);
             
@@ -481,7 +632,30 @@
             }
         }
 
-        // === FPS MONITORING (TIDAK DIUBAH) ===
+        // === FUNGSI VAR REPLAY ===
+        function saveVAR(camId) {
+            log(`📼 Memproses video VAR untuk ${camId}... (Harap tunggu)`);
+            
+            fetch(`/api/var/save/${camId}`, {
+                method: 'POST'
+            })
+            .then(response => response.json())
+            .then(data => {
+                if(data.success) {
+                    log(`✅ SUKSES: ${data.message}`);
+                    alert(data.message + "\n\nCek folder 'var_clips' di laptop Anda!");
+                } else {
+                    log(`❌ GAGAL: ${data.message}`);
+                    alert(data.message);
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                log(`❌ Error jaringan saat menyimpan VAR`);
+            });
+        }
+
+        // === FPS MONITORING ===
         function updateFPS() {
             {% for id, node in nodes.items() %}
             fetch('/api/fps/{{ id }}')
@@ -491,7 +665,6 @@
                     if (data.fps !== null) {
                         fpsEl.textContent = data.fps.toFixed(1);
                         
-                        // Color based on FPS
                         if (data.fps >= 12) {
                             fpsEl.className = 'text-xs font-bold text-accent';
                         } else if (data.fps >= 8) {
@@ -510,7 +683,7 @@
             {% endfor %}
         }
 
-        // === CHECK CALIBRATION STATUS ON LOAD ===
+        // === INITIALIZATION ===
         function checkCalibrationStatus() {
             {% for id, node in nodes.items() %}
             fetch('/api/calibration_status/{{ id }}')
@@ -522,12 +695,10 @@
             {% endfor %}
         }
 
-        // === INITIALIZATION ===
         window.addEventListener('load', () => {
-            log('✅ Dashboard v2.1 loaded');
+            log('✅ Dashboard v2.2 loaded');
             checkCalibrationStatus();
             
-            // Update FPS every 2 seconds
             setInterval(updateFPS, 2000);
             updateFPS();
         });

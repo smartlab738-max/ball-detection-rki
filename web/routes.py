@@ -65,19 +65,30 @@ def toggle_ai():
     res = manager.set_ai_mode(tgt, status)
     return jsonify(res)
 
+# === DIPERBARUI: MENGGUNAKAN GAMBAR BERSIH DARI VAR BUFFER ===
 @bp.route('/api/calibrate/auto/<nid>', methods=['POST'])
 def auto_calibrate(nid):
     node = manager.get_node(nid)
     if not node: return jsonify({"success": False, "message": "Node not found"}), 404
     
-    frame_bytes = node.get_frame()
-    if not frame_bytes: return jsonify({"success": False, "message": "Frame not ready"}), 400
+    if not node.running:
+         return jsonify({"success": False, "message": "Kamera sedang mati. Nyalakan dulu (START)."}), 400
     
-    nparr = np.frombuffer(frame_bytes, np.uint8)
-    frame = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
+    # Ambil gambar bersih dari memori VAR agar coretan AI tidak mengganggu deteksi garis
+    if hasattr(node, 'var_buffer') and len(node.var_buffer) > 0:
+        frame = node.var_buffer[-1].copy()
+    else:
+        # Fallback jika memori VAR belum siap
+        frame_bytes = node.get_frame()
+        if not frame_bytes: return jsonify({"success": False, "message": "Frame not ready"}), 400
+        nparr = np.frombuffer(frame_bytes, np.uint8)
+        frame = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
     
     success = node.ai.auto_calibrate(frame)
-    return jsonify({"success": success, "message": "Kalibrasi Berhasil" if success else "Gagal Deteksi Meja"})
+    return jsonify({
+        "success": success, 
+        "message": "Kalibrasi Otomatis Berhasil!" if success else "Gagal Deteksi Meja. Coba Manual."
+    })
 
 @bp.route('/api/analytics/<nid>')
 def get_analytics(nid):
@@ -162,7 +173,7 @@ def calibrate_camera():
         # Reload calibration in the active camera node
         node = manager.get_node(camera_id)
         if node and node.ai:
-            # Reload AI processor calibration
+            # Reload AI processor calibration (Ini akan memanggil _update_drawing_cache otomatis)
             node.ai._load_calibration()
         
         return jsonify({
@@ -210,3 +221,38 @@ def get_fps(nid):
         "fps": fps,
         "timestamp": time.time()
     })
+
+# === FITUR VAR ENDPOINT (BARU) ===
+@bp.route('/api/var/save/<nid>', methods=['POST'])
+def save_var(nid):
+    """Endpoint untuk mengekspor isi Ring Buffer menjadi video MP4 Slow-Motion"""
+    node = manager.get_node(nid)
+    
+    if not node:
+        return jsonify({"success": False, "message": "Kamera tidak ditemukan"}), 404
+    
+    if not node.running:
+        return jsonify({"success": False, "message": "Kamera sedang mati, memori video kosong!"}), 400
+        
+    # Panggil fungsi penjahit MP4 di dalam camera_node.py
+    if hasattr(node, 'save_var_clip'):
+        result = node.save_var_clip()
+        return jsonify(result)
+    else:
+        return jsonify({"success": False, "message": "Fitur VAR belum tersedia di node ini"}), 501
+    
+@bp.route('/api/var/list')
+def list_var_clips():
+    """Mengambil daftar semua video klip VAR yang tersimpan"""
+    var_dir = "var_clips"
+    if not os.path.exists(var_dir):
+        return jsonify([])
+    # Ambil file mp4 dan urutkan (yang terbaru di atas)
+    files = [f for f in os.listdir(var_dir) if f.endswith('.mp4')]
+    files.sort(reverse=True) 
+    return jsonify(files)
+
+@bp.route('/var_clips/<filename>')
+def serve_var_clip(filename):
+    """Menyajikan file video MP4 ke web browser"""
+    return send_from_directory(os.path.abspath("var_clips"), filename)
