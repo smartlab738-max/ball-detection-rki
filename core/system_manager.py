@@ -1,5 +1,6 @@
 import json
 import os
+from datetime import datetime
 from .camera_node import CameraNode
 from .ai_processor import AIProcessor
 
@@ -17,9 +18,6 @@ class SystemManager:
         
         # Path model openvino
         model_path = os.path.join(self.base_path, 'models', 'best_openvino_model')
-        
-        # Path model YOLOv8
-        # model_path = os.path.join(self.base_path, 'models', 'best.pt')
 
         for nid, c in cfg.items():
             # Inisialisasi AIProcessor unik untuk setiap ID kamera
@@ -43,7 +41,7 @@ class SystemManager:
         for node in self.nodes.values():
             node.stop_receiver()
 
-    # --- FUNGSI KONTROL YANG SUDAH DI-OPTIMASI ---
+    # --- FUNGSI KONTROL ---
 
     def broadcast_command(self, action, w, h, fps):
         """Mengirim perintah ke SEMUA node kamera dan mengatur thread lokal."""
@@ -54,12 +52,12 @@ class SystemManager:
             # 1. Kirim perintah ke Raspberry Pi via TCP
             res[nid] = node.send_command(action, w, h, fps)
             
-            # 2. Manajemen Thread Lokal (Optimasi 3)
+            # 2. Manajemen Thread Lokal (Mencegah CPU Panas)
             if act_lower in ['stop', 'restart_service', 'reboot_pi', 'shutdown_pi']:
-                node.stop_receiver() # Matikan proses pembacaan video di laptop
+                node.stop_receiver() 
             elif act_lower == 'start':
                 if not node.running:
-                    node.start_receiver() # Hidupkan kembali jika sebelumnya mati
+                    node.start_receiver() 
                     
         return res
 
@@ -72,12 +70,12 @@ class SystemManager:
             # 1. Kirim perintah ke Raspberry Pi via TCP
             response = node.send_command(action, w, h, fps)
             
-            # 2. Manajemen Thread Lokal (Optimasi 3)
+            # 2. Manajemen Thread Lokal
             if act_lower in ['stop', 'restart_service', 'reboot_pi', 'shutdown_pi']:
-                node.stop_receiver() # Matikan proses pembacaan video di laptop
+                node.stop_receiver() 
             elif act_lower == 'start':
                 if not node.running:
-                    node.start_receiver() # Hidupkan kembali jika sebelumnya mati
+                    node.start_receiver() 
                     
             return {nid: response}
             
@@ -93,3 +91,31 @@ class SystemManager:
             if node: 
                 node.set_ai_status(enabled)
         return {"status": "ok", "ai": enabled}
+
+    # === FITUR BARU: MASTER VAR SINKRONISASI ===
+    def save_global_var(self):
+        """Memerintahkan semua kamera aktif untuk menyimpan VAR di detik yang sama persis"""
+        # 1. Buat satu Waktu Kejadian (Timestamp) untuk dipakai bersama
+        sync_time = datetime.now().strftime("%H%M%S")
+        saved_count = 0
+        
+        # 2. Perintahkan seluruh kamera yang sedang aktif
+        for nid, node in self.nodes.items():
+            # Hanya simpan dari kamera yang sedang menyala (running)
+            if node.running and hasattr(node, 'save_var_clip'):
+                # Berikan sync_time ke fungsi save_var_clip milik node tersebut
+                res = node.save_var_clip(sync_timestamp=sync_time)
+                if res.get("success"):
+                    saved_count += 1
+                    
+        # 3. Kembalikan status ke Web Dashboard
+        if saved_count > 0:
+            return {
+                "success": True, 
+                "message": f"Berhasil merekam kejadian (Event {sync_time}) dari {saved_count} Kamera berbeda!"
+            }
+        else:
+            return {
+                "success": False, 
+                "message": "Gagal menyimpan klip. Pastikan minimal ada 1 kamera yang sudah di-START."
+            }

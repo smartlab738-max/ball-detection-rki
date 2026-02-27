@@ -1,4 +1,4 @@
-from flask import Blueprint, render_template, Response, request, jsonify
+from flask import Blueprint, render_template, Response, request, jsonify, send_from_directory
 import time
 import cv2
 import numpy as np
@@ -65,7 +65,6 @@ def toggle_ai():
     res = manager.set_ai_mode(tgt, status)
     return jsonify(res)
 
-# === DIPERBARUI: MENGGUNAKAN GAMBAR BERSIH DARI VAR BUFFER ===
 @bp.route('/api/calibrate/auto/<nid>', methods=['POST'])
 def auto_calibrate(nid):
     node = manager.get_node(nid)
@@ -96,7 +95,6 @@ def get_analytics(nid):
     if not node or not node.ai: return jsonify({"error": "No AI"}), 404
     
     stats = node.ai.get_zone_stats()
-    # Fix KeyError dengan default value
     if not stats:
         return jsonify({"calibrated": False, "total_hits": 0, "zones": [0]*9, "zone_names": ["Z"]*9})
 
@@ -136,10 +134,6 @@ def toggle_zone_grid(nid):
 
 @bp.route('/api/calibrate', methods=['POST'])
 def calibrate_camera():
-    """
-    Web-based calibration endpoint.
-    Receives 4 corner points from browser and computes homography.
-    """
     camera_id = request.form.get('camera_id')
     corners_json = request.form.get('corners')
     
@@ -147,33 +141,22 @@ def calibrate_camera():
         return jsonify({"success": False, "error": "Missing parameters"}), 400
     
     try:
-        # Parse corners from JSON
         corners_raw = json.loads(corners_json)
-        
-        # Convert to numpy array (format: [[x,y], [x,y], [x,y], [x,y]])
         corners = np.array([[pt['x'], pt['y']] for pt in corners_raw], dtype=np.float32)
         
-        # Import court detector
         from core.court_detector import CourtDetector
-        
-        # Create detector and set corners
         detector = CourtDetector()
         detector.set_manual_corners(corners)
-        
-        # Compute homography
         detector.compute_homography(scale_factor=2.0)
         
-        # Save calibration
         cal_dir = "config/calibration"
         os.makedirs(cal_dir, exist_ok=True)
         
         cal_path = os.path.join(cal_dir, f"{camera_id}_homography.json")
         detector.save_calibration(cal_path)
         
-        # Reload calibration in the active camera node
         node = manager.get_node(camera_id)
         if node and node.ai:
-            # Reload AI processor calibration (Ini akan memanggil _update_drawing_cache otomatis)
             node.ai._load_calibration()
         
         return jsonify({
@@ -181,72 +164,65 @@ def calibrate_camera():
             "camera_id": camera_id,
             "message": "Calibration saved successfully"
         })
-    
     except Exception as e:
         print(f"[API] Calibration error: {e}")
-        import traceback
-        traceback.print_exc()
         return jsonify({"success": False, "error": str(e)}), 500
 
 @bp.route('/api/calibration_status/<nid>')
 def get_calibration_status(nid):
-    """
-    Check if a camera is calibrated.
-    """
     cal_path = f"config/calibration/{nid}_homography.json"
     calibrated = os.path.exists(cal_path)
-    
     return jsonify({
         "camera_id": nid,
         "calibrated": calibrated,
         "path": cal_path if calibrated else None
     })
 
-# === FPS MONITORING ENDPOINT ===
 @bp.route('/api/fps/<nid>')
 def get_fps(nid):
-    """
-    Get current FPS for a camera.
-    """
     node = manager.get_node(nid)
-    
     if not node:
         return jsonify({"camera_id": nid, "fps": None, "error": "Camera not found"}), 404
-    
-    # Get FPS from camera node
     fps = node.get_fps() if hasattr(node, 'get_fps') else None
-    
     return jsonify({
         "camera_id": nid,
         "fps": fps,
         "timestamp": time.time()
     })
 
-# === FITUR VAR ENDPOINT (BARU) ===
+# === FITUR VAR ENDPOINT ===
+
 @bp.route('/api/var/save/<nid>', methods=['POST'])
 def save_var(nid):
-    """Endpoint untuk mengekspor isi Ring Buffer menjadi video MP4 Slow-Motion"""
+    """VAR Individual per Kamera"""
     node = manager.get_node(nid)
-    
     if not node:
         return jsonify({"success": False, "message": "Kamera tidak ditemukan"}), 404
-    
     if not node.running:
         return jsonify({"success": False, "message": "Kamera sedang mati, memori video kosong!"}), 400
         
-    # Panggil fungsi penjahit MP4 di dalam camera_node.py
     if hasattr(node, 'save_var_clip'):
         result = node.save_var_clip()
         return jsonify(result)
     else:
         return jsonify({"success": False, "message": "Fitur VAR belum tersedia di node ini"}), 501
-    
+
+@bp.route('/api/var/save_all', methods=['POST'])
+def save_all_var():
+    """VAR Global - Menyimpan dari seluruh kamera sekaligus di detik yang sama"""
+    if not manager:
+        return jsonify({"success": False, "message": "Sistem belum siap"}), 500
+        
+    result = manager.save_global_var()
+    return jsonify(result)
+
 @bp.route('/api/var/list')
 def list_var_clips():
     """Mengambil daftar semua video klip VAR yang tersimpan"""
     var_dir = "var_clips"
     if not os.path.exists(var_dir):
         return jsonify([])
+        
     # Ambil file mp4 dan urutkan (yang terbaru di atas)
     files = [f for f in os.listdir(var_dir) if f.endswith('.mp4')]
     files.sort(reverse=True) 
