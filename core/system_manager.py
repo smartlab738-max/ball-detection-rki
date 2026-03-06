@@ -3,6 +3,7 @@ import os
 from datetime import datetime
 from .camera_node import CameraNode
 from .ai_processor import AIProcessor
+from .mqtt_listener import NetSensorListener
 
 class SystemManager:
     def __init__(self, config_path):
@@ -10,6 +11,10 @@ class SystemManager:
         # Mendapatkan path absolut ke folder models
         self.base_path = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
         self.load_config(config_path)
+        
+        # --- TAMBAHAN: Mulai mendengarkan sensor net via MQTT ---
+        self.net_sensor = NetSensorListener(system_manager=self)
+        self.net_sensor.start()
 
     def load_config(self, path):
         """Memuat konfigurasi node dan inisialisasi AI per kamera."""
@@ -40,6 +45,10 @@ class SystemManager:
         """Fungsi utilitas untuk mematikan semua thread saat aplikasi Flask ditutup."""
         for node in self.nodes.values():
             node.stop_receiver()
+            
+        # --- TAMBAHAN: Matikan koneksi MQTT dengan sopan ---
+        if hasattr(self, 'net_sensor'):
+            self.net_sensor.stop()
 
     # --- FUNGSI KONTROL ---
 
